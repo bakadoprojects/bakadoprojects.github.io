@@ -1,0 +1,71 @@
+name: Remove public photo upload
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/remove-public-upload.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out site
+        uses: actions/checkout@v4
+
+      - name: Remove visitor upload controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          html = html.replace(
+              'Eklediğiniz fotoğraflar bu cihazdaki tarayıcıda saklanır. Diğer ziyaretçilerin görebilmesi için fotoğrafları daha sonra site dosyasına veya ücretsiz bulut depolamaya eklememiz gerekir.',
+              'Bu alanda BAKADO tarafından seçilen ortak proje fotoğrafları yer alır.'
+          )
+
+          html, removed_uploader = re.subn(
+              r'\\n      <div class="uploader">.*?</div>\\n      <div id="gallery"',
+              '\\n      <div id="gallery"',
+              html,
+              count=1,
+              flags=re.S,
+          )
+          if removed_uploader != 1:
+              raise SystemExit(f'Beklenen yükleme alanı bulunamadı: {removed_uploader}')
+
+          html, removed_script = re.subn(
+              r'<script id="partners-gallery-script">.*?</script>\\n',
+              '',
+              html,
+              count=1,
+              flags=re.S,
+          )
+          if removed_script != 1:
+              raise SystemExit(f'Beklenen galeri betiği bulunamadı: {removed_script}')
+
+          html = html.replace(
+              'Henüz fotoğraf eklenmedi.',
+              'Seçili proje fotoğrafları yakında burada yer alacak.'
+          )
+          path.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit site update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Değişiklik gerekmedi"
+            exit 0
+          fi
+          git add index.html
+          git commit -m "Ziyaretçi fotoğraf yüklemesini kaldır"
+          git push
