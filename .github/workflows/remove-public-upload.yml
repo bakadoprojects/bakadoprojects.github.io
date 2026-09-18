@@ -22,7 +22,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           path = Path('index.html')
           html = path.read_text(encoding='utf-8')
@@ -31,25 +30,17 @@ jobs:
               'Bu alanda BAKADO tarafından seçilen ortak proje fotoğrafları yer alır.'
           )
 
-          html, removed_uploader = re.subn(
-              r'\\n      <div class="uploader">.*?</div>\\n      <div id="gallery"',
-              '\\n      <div id="gallery"',
-              html,
-              count=1,
-              flags=re.S,
-          )
-          if removed_uploader != 1:
-              raise SystemExit(f'Beklenen yükleme alanı bulunamadı: {removed_uploader}')
+          start = html.find('      <div class="uploader">')
+          end = html.find('      <div id="gallery"', start)
+          if start == -1 or end == -1:
+              raise SystemExit('Beklenen ziyaretçi yükleme alanı bulunamadı')
+          html = html[:start] + html[end:]
 
-          html, removed_script = re.subn(
-              r'<script id="partners-gallery-script">.*?</script>\\n',
-              '',
-              html,
-              count=1,
-              flags=re.S,
-          )
-          if removed_script != 1:
-              raise SystemExit(f'Beklenen galeri betiği bulunamadı: {removed_script}')
+          start = html.find('<script id="partners-gallery-script">')
+          end = html.find('</script>', start)
+          if start == -1 or end == -1:
+              raise SystemExit('Beklenen galeri betiği bulunamadı')
+          html = html[:start] + html[end + len('</script>'):]
 
           html = html.replace(
               'Henüz fotoğraf eklenmedi.',
