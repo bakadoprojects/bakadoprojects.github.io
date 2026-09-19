@@ -1,0 +1,43 @@
+name: Update custom domain SEO
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/update-custom-domain-seo.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-domain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out site
+        uses: actions/checkout@v4
+
+      - name: Replace old GitHub Pages URLs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          html = html.replace('https://bakadoprojects.github.io/', 'https://bakado.com.tr/')
+          html = html.replace('https://bakadoprojects.github.io', 'https://bakado.com.tr')
+          path.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit SEO domain update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Değişiklik gerekmedi"
+            exit 0
+          fi
+          git add index.html
+          git commit -m "Canonical ve marka adresini bakado.com.tr olarak güncelle"
+          git push

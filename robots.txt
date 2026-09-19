@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bakadoprojects.github.io/sitemap.xml
+Sitemap: https://bakado.com.tr/sitemap.xml
