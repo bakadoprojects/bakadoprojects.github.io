@@ -18,57 +18,33 @@ jobs:
       - name: Check out site
         uses: actions/checkout@v4
 
-      - name: Apply gallery and Google branding updates
+      - name: Apply BAKADO Google branding
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           path = Path('index.html')
           html = path.read_text(encoding='utf-8')
-
-          html = html.replace(
-              'Eklediğiniz fotoğraflar bu cihazdaki tarayıcıda saklanır. Diğer ziyaretçilerin görebilmesi için fotoğrafları daha sonra site dosyasına veya ücretsiz bulut depolamaya eklememiz gerekir.',
-              'Bu alanda BAKADO tarafından seçilen ortak proje fotoğrafları yer alır.'
-          )
-
-          start = html.find('      <div class="uploader">')
-          end = html.find('      <div id="gallery"', start)
-          if start != -1 and end != -1:
-              html = html[:start] + html[end:]
-
-          start = html.find('<script id="partners-gallery-script">')
-          end = html.find('</script>', start)
-          if start != -1 and end != -1:
-              html = html[:start] + html[end + len('</script>'):]
-
-          html = html.replace(
-              'Henüz fotoğraf eklenmedi.',
-              'Seçili proje fotoğrafları yakında burada yer alacak.'
-          )
-
           start_marker = '<!-- BAKADO-SEARCH-BRAND-START -->'
           end_marker = '<!-- BAKADO-SEARCH-BRAND-END -->'
+
           if start_marker in html and end_marker in html:
               before, rest = html.split(start_marker, 1)
               _, after = rest.split(end_marker, 1)
               html = before + after
 
-          brand = '''<!-- BAKADO-SEARCH-BRAND-START -->
-<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">
-<link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="application-name" content="BAKADO">
-<meta property="og:site_name" content="BAKADO">
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "BAKADO",
-  "alternateName": ["BAKADO Mobilya", "BAKADO Projects"],
-  "url": "https://bakadoprojects.github.io/"
-}
-</script>
-<!-- BAKADO-SEARCH-BRAND-END -->
-'''
+          brand_lines = [
+              start_marker,
+              '<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">',
+              '<link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml">',
+              '<meta name="application-name" content="BAKADO">',
+              '<meta property="og:site_name" content="BAKADO">',
+              '<script type="application/ld+json">',
+              '{"@context":"https://schema.org","@type":"WebSite","name":"BAKADO","alternateName":["BAKADO Mobilya","BAKADO Projects"],"url":"https://bakadoprojects.github.io/"}',
+              '</script>',
+              end_marker,
+          ]
+          brand = '\n'.join(brand_lines) + '\n'
           if '</head>' not in html:
               raise SystemExit('index.html içinde head kapanışı bulunamadı')
           html = html.replace('</head>', brand + '</head>', 1)
