@@ -1,0 +1,69 @@
+name: Brand Google search result
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/brand-search-result.yml
+      - favicon.svg
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-brand-signals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out site
+        uses: actions/checkout@v4
+
+      - name: Add BAKADO site name and favicon
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          start_marker = '<!-- BAKADO-SEARCH-BRAND-START -->'
+          end_marker = '<!-- BAKADO-SEARCH-BRAND-END -->'
+
+          if start_marker in html and end_marker in html:
+              before, rest = html.split(start_marker, 1)
+              _, after = rest.split(end_marker, 1)
+              html = before + after
+
+          brand = '''<!-- BAKADO-SEARCH-BRAND-START -->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">
+<link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="application-name" content="BAKADO">
+<meta property="og:site_name" content="BAKADO">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "BAKADO",
+  "alternateName": ["BAKADO Mobilya", "BAKADO Projects"],
+  "url": "https://bakadoprojects.github.io/"
+}
+</script>
+<!-- BAKADO-SEARCH-BRAND-END -->
+'''
+          if '</head>' not in html:
+              raise SystemExit('index.html içinde </head> bulunamadı')
+          html = html.replace('</head>', brand + '</head>', 1)
+          path.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit site update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Değişiklik gerekmedi"
+            exit 0
+          fi
+          git add index.html
+          git commit -m "BAKADO site adı ve favicon sinyallerini ekle"
+          git push
