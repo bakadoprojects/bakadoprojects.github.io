@@ -1,0 +1,150 @@
+name: Optimize Antalya local SEO
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/optimize-local-seo.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  optimize-seo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out site
+        uses: actions/checkout@v4
+
+      - name: Update local SEO signals
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+
+          title = 'BAKADO | Antalya Özel Mobilya ve İç Mimarlık'
+          description = 'BAKADO, Antalya’da özel ölçü mobilya, iç mimari proje, mutfak, TV ünitesi ve giyinme odası tasarım, üretim ve uygulama hizmetleri sunar.'
+
+          html, title_count = re.subn(
+              r'(?is)<title\b[^>]*>.*?</title>',
+              f'<title>{title}</title>',
+              html,
+              count=1,
+          )
+          if title_count == 0:
+              html = re.sub(r'(?i)</head>', f'<title>{title}</title>\n</head>', html, count=1)
+
+          meta_keys = [
+              ('name', 'description'),
+              ('name', 'keywords'),
+              ('name', 'geo.region'),
+              ('name', 'geo.placename'),
+              ('property', 'og:title'),
+              ('property', 'og:description'),
+              ('property', 'og:url'),
+              ('property', 'og:type'),
+              ('property', 'og:locale'),
+              ('name', 'twitter:card'),
+              ('name', 'twitter:title'),
+              ('name', 'twitter:description'),
+          ]
+          for attr, key in meta_keys:
+              pattern = re.compile(
+                  rf'(?is)<meta\b(?=[^>]*\b{attr}\s*=\s*["\']{re.escape(key)}["\'])[^>]*>'
+              )
+              html = pattern.sub('', html)
+
+          html = re.sub(
+              r'(?is)<link\b(?=[^>]*\brel\s*=\s*["\']canonical["\'])[^>]*>',
+              '',
+              html,
+          )
+          html = re.sub(
+              r'(?is)\s*<!-- BAKADO LOCAL SEO START -->.*?<!-- BAKADO LOCAL SEO END -->\s*',
+              '\n',
+              html,
+          )
+
+          schema = {
+              '@context': 'https://schema.org',
+              '@type': 'HomeAndConstructionBusiness',
+              '@id': 'https://bakado.com.tr/#business',
+              'name': 'BAKADO',
+              'alternateName': 'BAKADO Mobilya ve İç Mimarlık',
+              'url': 'https://bakado.com.tr/',
+              'logo': 'https://bakado.com.tr/favicon.svg',
+              'description': description,
+              'telephone': '+90 546 934 33 61',
+              'email': 'fipbakado@gmail.com',
+              'address': {
+                  '@type': 'PostalAddress',
+                  'addressLocality': 'Antalya',
+                  'addressCountry': 'TR'
+              },
+              'areaServed': {
+                  '@type': 'City',
+                  'name': 'Antalya'
+              },
+              'sameAs': ['https://www.instagram.com/bakado_projects/'],
+              'knowsAbout': [
+                  'Özel ölçü mobilya',
+                  'İç mimarlık',
+                  'İç mimari proje',
+                  'Mutfak tasarımı',
+                  'TV ünitesi',
+                  'Giyinme odası',
+                  'Mobilya üretimi ve uygulama'
+              ]
+          }
+
+          seo_block = '''<!-- BAKADO LOCAL SEO START -->
+          <meta name="description" content="{description}">
+          <meta name="keywords" content="Antalya özel mobilya, Antalya iç mimarlık, Antalya iç mimari proje, Antalya mutfak dolabı, Antalya TV ünitesi, Antalya giyinme odası, özel ölçü mobilya, kişiye özel mobilya">
+          <meta name="geo.region" content="TR-07">
+          <meta name="geo.placename" content="Antalya">
+          <link rel="canonical" href="https://bakado.com.tr/">
+          <meta property="og:title" content="{title}">
+          <meta property="og:description" content="{description}">
+          <meta property="og:url" content="https://bakado.com.tr/">
+          <meta property="og:type" content="website">
+          <meta property="og:locale" content="tr_TR">
+          <meta name="twitter:card" content="summary_large_image">
+          <meta name="twitter:title" content="{title}">
+          <meta name="twitter:description" content="{description}">
+          <script type="application/ld+json">{schema}</script>
+          <!-- BAKADO LOCAL SEO END -->'''.format(
+              title=title,
+              description=description,
+              schema=json.dumps(schema, ensure_ascii=False, separators=(',', ':')),
+          )
+          html = re.sub(r'(?i)</head>', seo_block + '\n</head>', html, count=1)
+
+          html = html.replace(
+              'FURNITURE · INTERIORS · PROJECTS',
+              'ANTALYA · ÖZEL MOBİLYA · İÇ MİMARLIK',
+          )
+          html = html.replace(
+              'Villa, konut ve seçkin ticari mekânlar için kişiye özel mobilya, iç mimari tasarım ve çözüm ortaklarımızla kontrollü uygulama hizmeti sunuyoruz.',
+              'Antalya’da villa, konut ve seçkin ticari mekânlar için özel ölçü mobilya, iç mimari proje, mutfak, TV ünitesi ve giyinme odası tasarım, üretim ve uygulama hizmetleri sunuyoruz.',
+          )
+
+          path.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit local SEO update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Değişiklik gerekmedi"
+            exit 0
+          fi
+          git add index.html
+          git commit -m "Antalya özel mobilya ve iç mimarlık SEO metinlerini güncelle"
+          git push
