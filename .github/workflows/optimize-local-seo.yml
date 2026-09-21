@@ -28,7 +28,7 @@ jobs:
           path = Path('index.html')
           html = path.read_text(encoding='utf-8')
 
-          title = 'BAKADO | Antalya Özel Mobilya ve İç Mimarlık'
+          title = 'BAKADO | İç Mimarlık'
           description = 'BAKADO, Antalya’da özel ölçü mobilya, iç mimari proje, mutfak, TV ünitesi ve giyinme odası tasarım, üretim ve uygulama hizmetleri sunar.'
 
           html, title_count = re.subn(
@@ -76,7 +76,7 @@ jobs:
               '@type': 'HomeAndConstructionBusiness',
               '@id': 'https://bakado.com.tr/#business',
               'name': 'BAKADO',
-              'alternateName': 'BAKADO Mobilya ve İç Mimarlık',
+              'alternateName': 'BAKADO İç Mimarlık',
               'url': 'https://bakado.com.tr/',
               'logo': 'https://bakado.com.tr/favicon.svg',
               'description': description,
@@ -126,8 +126,12 @@ jobs:
           html = re.sub(r'(?i)</head>', seo_block + '\n</head>', html, count=1)
 
           html = html.replace(
-              'FURNITURE · INTERIORS · PROJECTS',
               'ANTALYA · ÖZEL MOBİLYA · İÇ MİMARLIK',
+              'BAKADO · İÇ MİMARLIK',
+          )
+          html = html.replace(
+              'FURNITURE · INTERIORS · PROJECTS',
+              'BAKADO · İÇ MİMARLIK',
           )
           html = html.replace(
               'Villa, konut ve seçkin ticari mekânlar için kişiye özel mobilya, iç mimari tasarım ve çözüm ortaklarımızla kontrollü uygulama hizmeti sunuyoruz.',
@@ -146,5 +150,5 @@ jobs:
             exit 0
           fi
           git add index.html
-          git commit -m "Antalya özel mobilya ve iç mimarlık SEO metinlerini güncelle"
+          git commit -m "BAKADO ve İç Mimarlık başlığını güncelle"
           git push
