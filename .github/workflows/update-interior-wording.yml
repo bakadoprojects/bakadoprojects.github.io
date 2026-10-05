@@ -1,0 +1,63 @@
+name: Update BAKADO interior design wording
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/update-interior-wording.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bakado-wording-update
+  cancel-in-progress: false
+
+jobs:
+  update-wording:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace wording without changing layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import json
+
+          path = Path('index.html')
+          original = path.read_text(encoding='utf-8')
+          pattern = re.compile(r'iç\s+(?:mimari(?:\s+tasarım(?:ı)?)?|mimarlık)', re.IGNORECASE)
+          def substitute(match):
+              old = match.group(0)
+              if old.isupper():
+                  return 'İÇ MEKAN TASARIMI'
+              if all(word[0].isupper() for word in old.split()):
+                  return 'İç Mekan Tasarımı'
+              if old[0].isupper():
+                  return 'İç mekan tasarımı'
+              return 'iç mekan tasarımı'
+          updated, total = pattern.subn(substitute, original)
+          assert not pattern.search(updated), 'Old wording remains'
+          assert '<link rel="canonical" href="https://bakado.com.tr/">' in updated
+          for block in re.findall(r'<script[^>]*type=[\"\x27]application/ld\+json[\"\x27][^>]*>(.*?)</script>', updated, re.S | re.I):
+              json.loads(block)
+          old_images = re.findall(r'data:image/[^\"\x27\s>]+', original)
+          new_images = re.findall(r'data:image/[^\"\x27\s>]+', updated)
+          assert old_images == new_images, 'Image data changed'
+          path.write_text(updated, encoding='utf-8')
+          print('Replaced occurrences:', total)
+          print('Title:', re.search(r'<title>(.*?)</title>', updated, re.S).group(1))
+          PY
+      - name: Commit website wording
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- index.html; then
+            echo "No wording changes needed"
+            exit 0
+          fi
+          git add index.html
+          git commit -m "İç mimari ifadelerini İç Mekan Tasarımı olarak güncelle"
+          git push
