@@ -1,4 +1,4 @@
-name: Set BAKADO Proje site title
+name: Set BAKADO PROJE site title
 on:
   push:
     branches: [main]
@@ -19,11 +19,11 @@ jobs:
           import re
           path = Path('index.html')
           html = path.read_text(encoding='utf-8')
-          html, count = re.subn(r'(?is)<title\b[^>]*>.*?</title>', '<title>BAKADO Proje</title>', html, count=1)
+          html, count = re.subn(r'(?is)<title\b[^>]*>.*?</title>', '<title>BAKADO PROJE</title>', html, count=1)
           assert count == 1, 'Expected one page title'
           for attr, key in [('property', 'og:title'), ('name', 'twitter:title')]:
               pattern = re.compile(rf'(?is)<meta\b(?=[^>]*\b{attr}\s*=\s*["\x27]{re.escape(key)}["\x27])[^>]*>')
-              html = pattern.sub(f'<meta {attr}="{key}" content="BAKADO Proje">', html)
+              html = pattern.sub(f'<meta {attr}="{key}" content="BAKADO PROJE">', html)
           assert '<link rel="canonical" href="https://bakado.com.tr/">' in html
           path.write_text(html, encoding='utf-8')
           PY
@@ -33,5 +33,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --quiet -- index.html; then exit 0; fi
           git add index.html
-          git commit -m "Site ve paylaşım başlığını BAKADO Proje olarak güncelle"
+          git commit -m "Site ve paylaşım başlığını BAKADO PROJE olarak güncelle"
           git push
