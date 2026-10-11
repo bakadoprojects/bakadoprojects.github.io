@@ -2,11 +2,8 @@ name: Brand Google search result
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/brand-search-result.yml
-      - favicon.svg
+    branches: [main]
+    paths: [.github/workflows/brand-search-result.yml]
   workflow_dispatch:
 
 permissions:
@@ -16,54 +13,39 @@ jobs:
   update-brand-signals:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out site
-        uses: actions/checkout@v4
-
-      - name: Add BAKADO site name and favicon
+      - uses: actions/checkout@v4
+      - name: Update BAKADO PROJE search metadata
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
-          path = Path('index.html')
-          html = path.read_text(encoding='utf-8')
-          start_marker = '<!-- BAKADO-SEARCH-BRAND-START -->'
-          end_marker = '<!-- BAKADO-SEARCH-BRAND-END -->'
-
-          if start_marker in html and end_marker in html:
-              before, rest = html.split(start_marker, 1)
-              _, after = rest.split(end_marker, 1)
-              html = before + after
-
-          brand = '''<!-- BAKADO-SEARCH-BRAND-START -->
-<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">
-<link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="application-name" content="BAKADO">
-<meta property="og:site_name" content="BAKADO">
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "BAKADO",
-  "alternateName": ["BAKADO Mobilya", "BAKADO Projects"],
-  "url": "https://bakadoprojects.github.io/"
-}
-</script>
-<!-- BAKADO-SEARCH-BRAND-END -->
-'''
-          if '</head>' not in html:
-              raise SystemExit('index.html içinde </head> bulunamadı')
-          html = html.replace('</head>', brand + '</head>', 1)
-          path.write_text(html, encoding='utf-8')
+          import re, json
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          head, body = s.split('</head>', 1)
+          head = re.sub(r'<title>.*?</title>', '<title>BAKADO PROJE</title>', head, flags=re.S)
+          for key in ['application-name', 'og:site_name', 'og:title', 'twitter:title']:
+              pattern = r'(<meta\b[^>]*(?:name|property)="' + re.escape(key) + r'"[^>]*content=")[^"]*(")'
+              head, count = re.subn(pattern, r'\g<1>BAKADO PROJE\2', head)
+              assert count == 1, (key, count)
+          def update_schema(m):
+              obj = json.loads(m.group(2))
+              if obj.get('@type') in ['WebSite', 'HomeAndConstructionBusiness']:
+                  obj['name'] = 'BAKADO PROJE'
+                  obj['alternateName'] = 'BAKADO'
+                  obj['url'] = 'https://bakado.com.tr/'
+              return m.group(1) + json.dumps(obj, ensure_ascii=False, separators=(',', ':')) + m.group(3)
+          head = re.sub(r'(<script\b[^>]*type="application/ld\+json"[^>]*>)(.*?)(</script>)', update_schema, head, flags=re.S)
+          assert 'href="https://bakado.com.tr/"' in head
+          assert 'href="/favicon.svg"' in head
+          assert 'İç Mimarlık' not in head and 'İç Mimari' not in head
+          p.write_text(head + '</head>' + body, encoding='utf-8')
+          print('BAKADO PROJE search metadata updated; page body and favicon preserved.')
           PY
-
       - name: Commit site update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet; then
-            echo "Değişiklik gerekmedi"
-            exit 0
-          fi
+          if git diff --quiet; then exit 0; fi
           git add index.html
-          git commit -m "BAKADO site adı ve favicon sinyallerini ekle"
+          git commit -m "Google site adini BAKADO PROJE olarak guncelle"
           git push
