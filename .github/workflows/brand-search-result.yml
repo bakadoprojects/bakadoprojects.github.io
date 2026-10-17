@@ -1,51 +1,66 @@
 name: Brand Google search result
-
 on:
   push:
     branches: [main]
     paths: [.github/workflows/brand-search-result.yml]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   update-brand-signals:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update BAKADO PROJE search metadata
+      - name: Fix Google metadata truncation
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re, json
+          import re, json, base64, hashlib
           p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
+          original = p.read_text(encoding='utf-8')
+          assets = Path('assets/site-images')
+          assets.mkdir(parents=True, exist_ok=True)
+          replacements = {}
+          def externalize(m):
+              raw = base64.b64decode(m.group(2), validate=True)
+              ext = {'jpeg':'jpg', 'png':'png', 'webp':'webp', 'gif':'gif'}[m.group(1)]
+              target = assets / (hashlib.sha256(raw).hexdigest()[:24] + '.' + ext)
+              if target.exists():
+                  assert target.read_bytes() == raw
+              else:
+                  target.write_bytes(raw)
+              url = '/' + target.as_posix()
+              replacements[url] = m.group(0)
+              return url
+          s = re.sub(r'data:image/(jpeg|png|webp|gif);base64,([A-Za-z0-9+/=]+)', externalize, original)
+          restored = s
+          for url, data in replacements.items():
+              restored = restored.replace(url, data)
+          assert restored == original, 'Image extraction changed page content'
           head, body = s.split('</head>', 1)
-          head = re.sub(r'<title>.*?</title>', '<title>BAKADO PROJE</title>', head, flags=re.S)
-          for key in ['application-name', 'og:site_name', 'og:title', 'twitter:title']:
-              pattern = r'(<meta\b[^>]*(?:name|property)="' + re.escape(key) + r'"[^>]*content=")[^"]*(")'
-              head, count = re.subn(pattern, r'\g<1>BAKADO PROJE\2', head)
-              assert count == 1, (key, count)
-          def update_schema(m):
-              obj = json.loads(m.group(2))
-              if obj.get('@type') in ['WebSite', 'HomeAndConstructionBusiness']:
-                  obj['name'] = 'BAKADO PROJE'
-                  obj['alternateName'] = 'BAKADO'
-                  obj['url'] = 'https://bakado.com.tr/'
-              return m.group(1) + json.dumps(obj, ensure_ascii=False, separators=(',', ':')) + m.group(3)
-          head = re.sub(r'(<script\b[^>]*type="application/ld\+json"[^>]*>)(.*?)(</script>)', update_schema, head, flags=re.S)
+          styles = re.findall(r'<style[^>]*>.*?</style>', head, flags=re.S)
+          head = re.sub(r'<style[^>]*>.*?</style>', '', head, flags=re.S) + ''.join(styles)
+          result = head + '</head>' + body
+          assert '<title>BAKADO PROJE</title>' in head
           assert 'href="https://bakado.com.tr/"' in head
           assert 'href="/favicon.svg"' in head
-          assert 'İç Mimarlık' not in head and 'İç Mimari' not in head
-          p.write_text(head + '</head>' + body, encoding='utf-8')
-          print('BAKADO PROJE search metadata updated; page body and favicon preserved.')
+          assert len(result.encode('utf-8')) < 500000, 'HTML still too large'
+          assert head.index('application/ld+json') < 10000
+          schemas = re.findall('<script[^>]*type="application/ld[+]json"[^>]*>(.*?)</script>', head, flags=re.S)
+          assert len(schemas) == 2
+          for data in schemas:
+              obj = json.loads(data)
+              assert obj['name'] == 'BAKADO PROJE'
+              assert obj['url'] == 'https://bakado.com.tr/'
+          p.write_text(result, encoding='utf-8')
+          print('HTML bytes:', len(original.encode('utf-8')), '->', len(result.encode('utf-8')))
+          print('Unchanged images extracted:', len(replacements))
           PY
       - name: Commit site update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet; then exit 0; fi
-          git add index.html
-          git commit -m "Google site adini BAKADO PROJE olarak guncelle"
+          git add index.html assets/site-images
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Fix Google metadata truncation and preserve image content"
           git push
